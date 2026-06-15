@@ -8,7 +8,7 @@
 #
 # Bot          : @ArtistApibot
 # Channel      : https://t.me/artistbots
-# GitHub       : https://github.com/elevenyts
+# GitHub       : https://github.com/elevenyts 
 #
 # Unauthorized copying, modification, or redistribution
 # of this source code without permission is prohibited.
