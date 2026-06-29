@@ -74,7 +74,7 @@ class Config:
         self.RADIO_IMG: str = getenv("RADIO_IMG", "https://iili.io/CAWTGyJ.jpg")
         
         # Sticker ID for welcome message
-        self.STICKER_ID: str = getenv("STICKER_ID", "CAACAgUAAxkBAAEE9yJqQqP7rMyKJsYTUh_Me2afdT1M6AAC0QwAAqVf0VYeQuzSBIwIhzwE)
+        self.STICKER_ID = getenv("STICKER_ID", "CAACAgUAaxkBAEe9yJqQqP7rMyKJsYtUh_Me2afdT1M6AACOQwAAqVf0VYeQuzSBIwIhzwE")
 
         # Moderation
         self.EXCLUDED_USERNAMES: List[str] = getenv("EXCLUDED_USERNAMES", "").split()
