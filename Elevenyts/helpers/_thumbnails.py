@@ -17,42 +17,38 @@ from Elevenyts.helpers import Track
 
 
 # ==========================================================
-# STEP 1: DIMENSIONS AND POSITIONS
+# DIMENSIONS AND POSITIONS
 # ==========================================================
 
-W, H = 1280, 720  # Full image size
+W, H = 1280, 720
 
-# Main Panel
 PANEL_W, PANEL_H = 1080, 620
 PANEL_X = (W - PANEL_W) // 2
 PANEL_Y = 50
 
-# Thumbnail Image
 THUMB_W, THUMB_H = 960, 410
 THUMB_X = PANEL_X + (PANEL_W - THUMB_W) // 2
 THUMB_Y = PANEL_Y + 25
 
-# Title Position
 TITLE_X = THUMB_X + 15
 TITLE_Y = THUMB_Y + THUMB_H + 30
 
-# Meta Info Position
 META_Y = TITLE_Y + 50
-
-# Progress Bar Position
 BAR_X = THUMB_X + 15
 BAR_Y = META_Y + 50
 BAR_TOTAL_LEN = 930
 
-# Max title width
 MAX_TITLE_WIDTH = 850
 
-# Bot Name
+# ==========================================================
+# BOT NAME
+# ==========================================================
+
 BOT_NAME = "𝓕𝓾𝓼𝓱𝓲𝓰𝓾𝓻𝓸X𝓜𝓾𝓼𝓲𝓬"
 
 
 # ==========================================================
-# STEP 2: HELPER FUNCTIONS
+# HELPER FUNCTIONS
 # ==========================================================
 
 def trim_text(text, font, max_width):
@@ -68,19 +64,21 @@ def trim_text(text, font, max_width):
 
 
 def format_views(views):
-    """Format view count"""
+    """Format view count - FIXED"""
     if not views:
-        return "Unknown Views"
+        return "0 Views"
     try:
         views = int(views)
-        if views >= 1000000:
+        if views >= 10000000:  # 10M+
             return f"{views//1000000}M Views"
-        elif views >= 1000:
+        elif views >= 1000000:  # 1M+
+            return f"{round(views/1000000, 1)}M Views"
+        elif views >= 1000:     # 1K+
             return f"{views//1000}K Views"
         else:
             return f"{views} Views"
     except:
-        return "Unknown Views"
+        return "0 Views"
 
 
 def format_duration(seconds):
@@ -95,7 +93,7 @@ def format_duration(seconds):
 
 
 # ==========================================================
-# STEP 3: MAIN THUMBNAIL CLASS
+# MAIN THUMBNAIL CLASS
 # ==========================================================
 
 class Thumbnail:
@@ -109,13 +107,15 @@ class Thumbnail:
             self.regular_font = ImageFont.truetype(font_path + "Inter-Light.ttf", 22)
             self.bot_font = ImageFont.truetype(font_path + "Raleway-Bold.ttf", 26)
             self.small_font = ImageFont.truetype(font_path + "Inter-Light.ttf", 18)
-            self.badge_font = ImageFont.truetype(font_path + "Raleway-Bold.ttf", 16)
+            self.badge_font = ImageFont.truetype(font_path + "Raleway-Bold.ttf", 20)
+            self.now_playing_font = ImageFont.truetype(font_path + "Raleway-Bold.ttf", 18)
         except:
             self.title_font = ImageFont.load_default()
             self.regular_font = ImageFont.load_default()
             self.bot_font = ImageFont.load_default()
             self.small_font = ImageFont.load_default()
             self.badge_font = ImageFont.load_default()
+            self.now_playing_font = ImageFont.load_default()
 
     async def download_thumb(self, url, path):
         """Download thumbnail from URL"""
@@ -137,11 +137,9 @@ class Thumbnail:
             
             output = f"cache/{song.id}_premium.png"
             
-            # Return cached if exists
             if os.path.exists(output):
                 return output
             
-            # Download thumbnail
             temp = f"cache/temp_{song.id}.jpg"
             thumb_url = getattr(song, 'thumbnail', None)
             
@@ -153,7 +151,6 @@ class Thumbnail:
             if not downloaded or not os.path.exists(temp):
                 return config.DEFAULT_THUMB
             
-            # Generate in thread pool
             return await asyncio.get_event_loop().run_in_executor(
                 None, self._generate_sync, temp, output, song
             )
@@ -166,23 +163,19 @@ class Thumbnail:
         """Generate thumbnail synchronously"""
         try:
             # ==========================================================
-            # STEP 4: CREATE BACKGROUND
+            # BACKGROUND
             # ==========================================================
             
-            # Load and resize thumbnail
             with Image.open(temp) as img:
                 base = img.resize((W, H)).convert("RGBA")
 
-            # Apply blur for dreamy effect
             bg = base.filter(ImageFilter.GaussianBlur(35))
             bg = ImageEnhance.Brightness(bg).enhance(0.30)
             bg = ImageEnhance.Contrast(bg).enhance(1.3)
 
-            # Dark overlay
             overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
             draw = ImageDraw.Draw(overlay)
 
-            # Vignette effect - dark corners
             for i in range(100, 0, -1):
                 alpha = int(180 * (1 - i / 100))
                 spread = i * 4
@@ -196,20 +189,18 @@ class Thumbnail:
             draw = ImageDraw.Draw(bg)
 
             # ==========================================================
-            # STEP 5: CREATE MAIN PANEL
+            # MAIN PANEL
             # ==========================================================
 
             panel = Image.new("RGBA", (PANEL_W, PANEL_H), (0, 0, 0, 0))
             pd = ImageDraw.Draw(panel)
 
-            # Main glass panel
             pd.rounded_rectangle(
                 (0, 0, PANEL_W, PANEL_H),
                 radius=50,
                 fill=(10, 10, 25, 200)
             )
 
-            # Gold border
             pd.rounded_rectangle(
                 (0, 0, PANEL_W, PANEL_H),
                 radius=50,
@@ -217,7 +208,6 @@ class Thumbnail:
                 width=2
             )
 
-            # Inner subtle glow
             pd.rounded_rectangle(
                 (3, 3, PANEL_W - 3, PANEL_H - 3),
                 radius=47,
@@ -225,7 +215,6 @@ class Thumbnail:
                 width=1
             )
 
-            # Top shine line
             pd.rounded_rectangle(
                 (15, 15, PANEL_W - 15, PANEL_H//3 + 20),
                 radius=42,
@@ -233,7 +222,6 @@ class Thumbnail:
                 width=1
             )
 
-            # Paste panel
             mask = Image.new("L", (PANEL_W, PANEL_H), 0)
             ImageDraw.Draw(mask).rounded_rectangle(
                 (0, 0, PANEL_W, PANEL_H), radius=50, fill=255
@@ -242,13 +230,11 @@ class Thumbnail:
             draw = ImageDraw.Draw(bg)
 
             # ==========================================================
-            # STEP 6: ADD THUMBNAIL WITH GOLD FRAME
+            # THUMBNAIL WITH GOLD FRAME
             # ==========================================================
 
-            # Resize thumbnail
             thumb = base.resize((THUMB_W, THUMB_H))
 
-            # Gold glow frame (minimal)
             for i in range(8, 0, -1):
                 alpha = int(25 * (i / 8))
                 draw.rounded_rectangle(
@@ -259,14 +245,12 @@ class Thumbnail:
                     width=1
                 )
 
-            # Paste thumbnail with rounded corners
             thumb_mask = Image.new("L", thumb.size, 0)
             ImageDraw.Draw(thumb_mask).rounded_rectangle(
                 (0, 0, THUMB_W, THUMB_H), radius=28, fill=255
             )
             bg.paste(thumb, (THUMB_X, THUMB_Y), thumb_mask)
 
-            # Gold border
             draw.rounded_rectangle(
                 (THUMB_X, THUMB_Y, THUMB_X + THUMB_W, THUMB_Y + THUMB_H),
                 radius=28,
@@ -274,7 +258,6 @@ class Thumbnail:
                 width=2
             )
 
-            # Inner border
             draw.rounded_rectangle(
                 (THUMB_X + 5, THUMB_Y + 5,
                  THUMB_X + THUMB_W - 5, THUMB_Y + THUMB_H - 5),
@@ -284,22 +267,19 @@ class Thumbnail:
             )
 
             # ==========================================================
-            # STEP 7: ADD SONG TITLE
+            # SONG TITLE
             # ==========================================================
 
-            # Gold accent bar
             draw.rounded_rectangle(
                 (TITLE_X, TITLE_Y + 2, TITLE_X + 6, TITLE_Y + 46),
                 radius=3,
                 fill=(212, 175, 55)
             )
 
-            # Get and trim title
             song_title = getattr(song, 'title', 'Unknown Track')
             clean_title = re.sub(r"\W+", " ", song_title).strip().title()
             final_title = trim_text(clean_title, self.title_font, MAX_TITLE_WIDTH)
 
-            # Title shadow
             draw.text(
                 (TITLE_X + 18, TITLE_Y + 3),
                 final_title,
@@ -307,7 +287,6 @@ class Thumbnail:
                 font=self.title_font
             )
 
-            # Main title - white
             draw.text(
                 (TITLE_X + 16, TITLE_Y + 1),
                 final_title,
@@ -316,11 +295,25 @@ class Thumbnail:
             )
 
             # ==========================================================
-            # STEP 8: ADD META INFO
+            # META INFO - FIXED VIEWS
             # ==========================================================
 
-            views = format_views(getattr(song, 'view_count', None))
-            meta_text = f"✦  PREMIUM  ✦  YOUTUBE  ✦  {views}"
+            # Get real views from song object
+            views = getattr(song, 'view_count', None)
+            
+            # If views is None, try to get from other attributes
+            if views is None:
+                views = getattr(song, 'views', None)
+            
+            # If still None, try to get from duration (some bots store views there)
+            if views is None:
+                views = getattr(song, 'views_count', None)
+            
+            # Format views
+            views_text = format_views(views)
+            
+            # Create meta text - CHANGED: Removed "PREMIUM" from here
+            meta_text = f"✦  YOUTUBE  ✦  {views_text}"
 
             draw.text(
                 (TITLE_X + 16, META_Y),
@@ -337,18 +330,16 @@ class Thumbnail:
             )
 
             # ==========================================================
-            # STEP 9: ADD PROGRESS BAR
+            # PROGRESS BAR
             # ==========================================================
 
-            # Background track
             draw.rounded_rectangle(
                 (BAR_X, BAR_Y - 4, BAR_X + BAR_TOTAL_LEN, BAR_Y + 4),
                 radius=8,
                 fill=(40, 40, 55)
             )
 
-            # Progress (gold gradient)
-            bar_len = 350  # Default progress
+            bar_len = 350
             for i in range(bar_len):
                 progress = i / bar_len if bar_len > 0 else 0
                 r = int(180 + 32 * progress)
@@ -359,7 +350,6 @@ class Thumbnail:
                     fill=(r, g, b, 200)
                 )
 
-            # Knob glow (minimal)
             for i in range(6, 0, -1):
                 alpha = int(30 * (i / 6))
                 draw.ellipse(
@@ -368,7 +358,6 @@ class Thumbnail:
                     fill=(212, 175, 55, alpha)
                 )
 
-            # Knob
             draw.ellipse(
                 (BAR_X + bar_len - 8, BAR_Y - 8,
                  BAR_X + bar_len + 8, BAR_Y + 8),
@@ -380,7 +369,6 @@ class Thumbnail:
                 fill=(255, 255, 255)
             )
 
-            # Time labels
             draw.text(
                 (BAR_X, BAR_Y + 16),
                 "00:00",
@@ -388,7 +376,6 @@ class Thumbnail:
                 font=self.small_font
             )
 
-            # Duration
             duration = getattr(song, 'duration', None)
             if duration and isinstance(duration, int):
                 duration = format_duration(duration)
@@ -407,17 +394,15 @@ class Thumbnail:
             )
 
             # ==========================================================
-            # STEP 10: ADD BOT NAME (SIDE POSITION)
+            # BOT NAME - TOP RIGHT (REPLACED "PREMIUM")
             # ==========================================================
 
             bot_text = f"✦ {BOT_NAME} ✦"
-
             bot_width = self.bot_font.getlength(bot_text)
-            bot_height = self.bot_font.getbbox(bot_text)[3] - self.bot_font.getbbox(bot_text)[1]
-
-            # Position: Bottom Right
+            
+            # Position: Top Right
             bot_x = PANEL_X + PANEL_W - bot_width - 30
-            bot_y = PANEL_Y + PANEL_H - bot_height - 20
+            bot_y = PANEL_Y + 15
 
             # Subtle glow
             for i in range(4, 0, -1):
@@ -437,32 +422,26 @@ class Thumbnail:
                 font=self.bot_font
             )
 
-            # Gold underline
-            draw.line(
-                [(bot_x, bot_y + bot_height + 4),
-                 (bot_x + bot_width, bot_y + bot_height + 4)],
-                fill=(212, 175, 55, 80),
-                width=1
-            )
-
             # ==========================================================
-            # STEP 11: ADD PREMIUM BADGE
+            # NOW PLAYING - BOTTOM RIGHT (REPLACED "PREMIUM")
             # ==========================================================
 
-            badge_text = "✦ PREMIUM ✦"
-            badge_width = self.badge_font.getlength(badge_text)
-            badge_x = PANEL_X + PANEL_W - badge_width - 30
-            badge_y = PANEL_Y + 15
+            now_playing_text = "✦ NOW PLAYING ✦"
+            np_width = self.now_playing_font.getlength(now_playing_text)
+            
+            # Position: Bottom Right (above bot name)
+            np_x = PANEL_X + PANEL_W - np_width - 30
+            np_y = PANEL_Y + PANEL_H - 60
 
             draw.text(
-                (badge_x, badge_y),
-                badge_text,
+                (np_x, np_y),
+                now_playing_text,
                 fill=(212, 175, 55, 150),
-                font=self.badge_font
+                font=self.now_playing_font
             )
 
             # ==========================================================
-            # STEP 12: ADD CORNER DECORATIONS
+            # CORNER DECORATIONS
             # ==========================================================
 
             corners = [
@@ -479,12 +458,11 @@ class Thumbnail:
                 )
 
             # ==========================================================
-            # STEP 13: SAVE IMAGE
+            # SAVE IMAGE
             # ==========================================================
 
             bg.save(output, "PNG")
 
-            # Clean temp
             try:
                 os.remove(temp)
             except:
