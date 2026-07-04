@@ -18,50 +18,61 @@ import re
 import asyncio
 import aiohttp
 import base64
+import math
+import random
 
 from PIL import (
     Image,
     ImageDraw,
     ImageEnhance,
     ImageFilter,
-    ImageFont
+    ImageFont,
+    ImageChops,
+    ImageOps
 )
 
 from Elevenyts import config
 from Elevenyts.helpers import Track
 
 
-PANEL_W, PANEL_H = 1030, 610
+# ========== ANIME STYLE DIMENSIONS ==========
+PANEL_W, PANEL_H = 1080, 620
 PANEL_X = (1280 - PANEL_W) // 2
-PANEL_Y = 55
+PANEL_Y = 50
 
-THUMB_W, THUMB_H = 930, 420
+THUMB_W, THUMB_H = 960, 420
 THUMB_X = PANEL_X + (PANEL_W - THUMB_W) // 2
-THUMB_Y = PANEL_Y + 30
+THUMB_Y = PANEL_Y + 20
 
-TITLE_X = THUMB_X + 5
-TITLE_Y = THUMB_Y + THUMB_H + 25
+TITLE_X = THUMB_X + 10
+TITLE_Y = THUMB_Y + THUMB_H + 30
 
-META_Y = TITLE_Y + 58
+META_Y = TITLE_Y + 55
+BAR_X = THUMB_X + 10
+BAR_Y = META_Y + 55
+BAR_RED_LEN = 340
+BAR_TOTAL_LEN = 940
 
-BAR_X = THUMB_X + 5
-BAR_Y = META_Y + 60
+MAX_TITLE_WIDTH = 830
 
-BAR_RED_LEN = 330
-BAR_TOTAL_LEN = 920
+# ========== ANIME COLOR PALETTE ==========
+ANIME_COLORS = {
+    'sakura': (255, 150, 200),      # Pink
+    'neon_blue': (0, 200, 255),     # Cyan
+    'lavender': (180, 130, 255),    # Purple
+    'sunset': (255, 100, 80),       # Orange/Red
+    'mint': (100, 255, 200),        # Mint Green
+    'gold': (255, 215, 0),          # Gold
+    'dark_purple': (20, 10, 40),
+    'glass_bg': (10, 5, 25, 200),
+}
 
-ICONS_W, ICONS_H = 420, 45
-ICONS_X = PANEL_X + (PANEL_W - ICONS_W) // 2
-ICONS_Y = BAR_Y + 65
-
-MAX_TITLE_WIDTH = 820
-
-_f = "QXJ0aXN0Qm90cyB8IEZ1c2hpZ3Vyb1hNdXNpYwo="
+# ========== BOT WATERMARK ==========
+BOT_NAME = "𝓕𝓾𝓼𝓱𝓲𝓰𝓾𝓻𝓸X𝓜𝓾𝓼𝓲𝓬"
 
 
 def _decode_f():
-    decoded = base64.b64decode(_f).decode("utf-8")
-    return f"✦ {decoded} ✦"
+    return f"✦ {BOT_NAME} ✦"
 
 
 def trim_to_width(text: str, font, max_w: int) -> str:
@@ -74,38 +85,116 @@ def trim_to_width(text: str, font, max_w: int) -> str:
     return ellipsis
 
 
-def draw_rounded_rect_border_glow(draw, box, radius, color, width, glow_color, glow_spread):
-    """Draw a glowing rounded rectangle border."""
-    x0, y0, x1, y1 = box
-    for i in range(glow_spread, 0, -1):
-        alpha = int(80 * (i / glow_spread))
-        gc = (*glow_color[:3], alpha)
-        draw.rounded_rectangle(
-            (x0 - i, y0 - i, x1 + i, y1 + i),
-            radius=radius + i,
-            outline=gc,
-            width=1
+def create_anime_pattern(width, height):
+    """Create anime-style decorative pattern"""
+    pattern = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(pattern)
+    
+    # Cherry blossom petals
+    for _ in range(15):
+        x = random.randint(0, width)
+        y = random.randint(0, height)
+        size = random.randint(8, 20)
+        alpha = random.randint(20, 60)
+        
+        # Petal shape (5-petal flower)
+        for i in range(5):
+            angle = (i / 5) * 2 * math.pi + random.uniform(0, 0.3)
+            px = x + int(size * math.cos(angle))
+            py = y + int(size * math.sin(angle))
+            draw.ellipse(
+                (px - size//3, py - size//3, px + size//3, py + size//3),
+                fill=(255, 150, 200, alpha)
+            )
+    
+    # Sparkle stars
+    for _ in range(30):
+        x = random.randint(0, width)
+        y = random.randint(0, height)
+        size = random.randint(2, 5)
+        alpha = random.randint(30, 80)
+        
+        # 4-point star
+        draw.line([(x - size, y), (x + size, y)], fill=(255, 255, 255, alpha), width=1)
+        draw.line([(x, y - size), (x, y + size)], fill=(255, 255, 255, alpha), width=1)
+    
+    # Glowing circles
+    for _ in range(8):
+        x = random.randint(0, width)
+        y = random.randint(0, height)
+        radius = random.randint(40, 120)
+        alpha = random.randint(5, 15)
+        color = random.choice([
+            (255, 150, 200, alpha),
+            (0, 200, 255, alpha),
+            (180, 130, 255, alpha)
+        ])
+        draw.ellipse(
+            (x - radius, y - radius, x + radius, y + radius),
+            outline=color,
+            width=2
         )
-    draw.rounded_rectangle(box, radius=radius, outline=color, width=width)
+    
+    return pattern
+
+
+def create_anime_glow(draw, x, y, radius, color, layers=12):
+    """Create glowing effect for anime style"""
+    for i in range(layers, 0, -1):
+        alpha = int(60 * (i / layers))
+        r = radius + i * 3
+        draw.ellipse(
+            (x - r, y - r, x + r, y + r),
+            fill=(color[0], color[1], color[2], alpha)
+        )
+
+
+def draw_anime_divider(draw, x, y, width):
+    """Draw anime-style decorative divider"""
+    # Main line with gradient
+    for i in range(width):
+        progress = i / width
+        r = int(0 + 255 * progress)
+        g = int(200 + 50 * progress)
+        b = int(255 - 150 * progress)
+        draw.line(
+            [(x + i, y), (x + i, y + 3)],
+            fill=(r, g, b, 200)
+        )
+    
+    # Small diamonds on ends
+    for pos in [0, width]:
+        draw.polygon(
+            [(x + pos - 5, y - 5), (x + pos, y - 10), 
+             (x + pos + 5, y - 5), (x + pos, y)],
+            fill=(0, 200, 255, 200)
+        )
 
 
 class Thumbnail:
 
     def __init__(self):
         try:
+            # Anime-style fonts
             self.title_font = ImageFont.truetype(
                 "Elevenyts/helpers/Raleway-Bold.ttf", 42)
             self.regular_font = ImageFont.truetype(
-                "Elevenyts/helpers/Inter-Light.ttf", 24)
+                "Elevenyts/helpers/Inter-Light.ttf", 22)
             self.signature_font = ImageFont.truetype(
-                "Elevenyts/helpers/Raleway-Bold.ttf", 26)
+                "Elevenyts/helpers/Raleway-Bold.ttf", 24)
             self.small_font = ImageFont.truetype(
-                "Elevenyts/helpers/Inter-Light.ttf", 20)
+                "Elevenyts/helpers/Inter-Light.ttf", 18)
+            self.anime_font = ImageFont.truetype(
+                "Elevenyts/helpers/Raleway-Bold.ttf", 32)
+            self.bot_font = ImageFont.truetype(
+                "Elevenyts/helpers/Raleway-Bold.ttf", 28)
         except OSError:
             self.title_font = ImageFont.load_default()
             self.regular_font = ImageFont.load_default()
             self.signature_font = ImageFont.load_default()
             self.small_font = ImageFont.load_default()
+            self.anime_font = ImageFont.load_default()
+            self.bot_font = ImageFont.load_default()
 
     async def save_thumb(self, output_path: str, url: str):
         async with aiohttp.ClientSession() as session:
@@ -117,213 +206,347 @@ class Thumbnail:
     async def generate(self, song: Track, size=(1280, 720)) -> str:
         try:
             temp = f"cache/temp_{song.id}.jpg"
-            output = f"cache/{song.id}_ultra.png"
+            output = f"cache/{song.id}_anime.png"
             if os.path.exists(output):
                 return output
             await self.save_thumb(temp, song.thumbnail)
             return await asyncio.get_event_loop().run_in_executor(
                 None, self._generate_sync, temp, output, song, size)
-        except Exception:
+        except Exception as e:
+            print(f"Error generating anime thumbnail: {e}")
             return config.DEFAULT_THUMB
 
     def _generate_sync(self, temp, output, song, size=(1280, 720)):
         try:
-            W, H = size  # 1280, 720
+            W, H = size
 
-            # 1. Background
+            # ===== 1. ANIME BACKGROUND =====
             with Image.open(temp) as tmp:
                 base = tmp.resize(size).convert("RGBA")
 
-            bg = base.filter(ImageFilter.GaussianBlur(32))
-            bg = ImageEnhance.Brightness(bg).enhance(0.22)
-            bg = ImageEnhance.Contrast(bg).enhance(1.5)
-
-            # Radial vignette overlay (dark edges)
-            vignette = Image.new("RGBA", size, (0, 0, 0, 0))
-            vd = ImageDraw.Draw(vignette)
-            for i in range(60, 0, -1):
-                alpha = int(160 * (1 - i / 60))
-                spread = i * 6
-                vd.ellipse(
-                    (W // 2 - spread, H // 2 - spread * 9 // 16,
-                     W // 2 + spread, H // 2 + spread * 9 // 16),
-                    fill=(0, 0, 0, alpha)
+            # Dreamy blur effect (anime style)
+            bg = base.filter(ImageFilter.GaussianBlur(35))
+            bg = ImageEnhance.Brightness(bg).enhance(0.3)
+            bg = ImageEnhance.Contrast(bg).enhance(1.3)
+            bg = ImageEnhance.Color(bg).enhance(0.7)
+            
+            # Anime-style color overlay
+            overlay = Image.new("RGBA", size, (0, 0, 0, 0))
+            od = ImageDraw.Draw(overlay)
+            
+            # Gradient overlay - anime sunset style
+            for i in range(H):
+                ratio = i / H
+                # Dark purple to transparent
+                alpha = int(120 * (1 - ratio * 0.9))
+                od.line(
+                    [(0, i), (W, i)],
+                    fill=(20, 5, 40, alpha)
                 )
-            bg = Image.alpha_composite(bg, vignette)
-
-            # Subtitle dark overlay
-            dark = Image.new("RGBA", size, (0, 0, 0, 100))
-            bg = Image.alpha_composite(bg, dark)
+            
+            # Pink overlay from bottom
+            for i in range(H):
+                ratio = i / H
+                if ratio > 0.3:
+                    alpha = int(60 * ((ratio - 0.3) / 0.7))
+                    od.line(
+                        [(0, i), (W, i)],
+                        fill=(255, 100, 150, alpha)
+                    )
+            
+            bg = Image.alpha_composite(bg, overlay)
+            
+            # Add anime pattern
+            pattern = create_anime_pattern(W, H)
+            bg = Image.alpha_composite(bg, pattern)
 
             draw = ImageDraw.Draw(bg)
 
-            # 2. Glass panel with glow border
+            # ===== 2. ANIME GLASS PANEL =====
             panel = Image.new("RGBA", (PANEL_W, PANEL_H), (0, 0, 0, 0))
             pd = ImageDraw.Draw(panel)
 
-            # Outer glow rings
-            CYAN = (0, 255, 255)
-            for gi in range(8, 0, -1):
-                ga = int(35 * (gi / 8))
+            # Glow rings - anime style
+            glow_colors = [
+                (255, 150, 200, 40),   # Pink
+                (0, 200, 255, 30),     # Cyan
+                (180, 130, 255, 25),   # Purple
+            ]
+            for i, color in enumerate(glow_colors):
+                spread = (i + 1) * 12
                 pd.rounded_rectangle(
-                    (0 - gi, 0 - gi, PANEL_W - 1 + gi, PANEL_H - 1 + gi),
-                    radius=42 + gi,
-                    outline=(0, 220, 255, ga),
-                    width=1
+                    (0 - spread, 0 - spread, PANEL_W + spread, PANEL_H + spread),
+                    radius=50 + spread,
+                    outline=color,
+                    width=2
                 )
 
-            # Glass fill
+            # Main glass with anime tint
             pd.rounded_rectangle(
                 (0, 0, PANEL_W - 1, PANEL_H - 1),
-                radius=42,
-                fill=(8, 8, 18, 165)
+                radius=46,
+                fill=(15, 5, 35, 180)  # Dark purple glass
             )
-            # Inner border
+            
+            # Animated border - gradient
+            for i in range(3, PANEL_W - 3, 5):
+                progress = i / PANEL_W
+                r = int(200 + 55 * abs(math.sin(progress * math.pi * 2)))
+                g = int(150 + 105 * abs(math.sin(progress * math.pi * 2 + 1)))
+                b = int(255 * abs(math.sin(progress * math.pi * 2 + 2)))
+                pd.rectangle(
+                    (i, 2, i + 3, 4),
+                    fill=(r, g, b, 180)
+                )
+                pd.rectangle(
+                    (i, PANEL_H - 5, i + 3, PANEL_H - 2),
+                    fill=(r, g, b, 180)
+                )
+            
+            # Inner glow
             pd.rounded_rectangle(
-                (0, 0, PANEL_W - 1, PANEL_H - 1),
+                (4, 4, PANEL_W - 5, PANEL_H//2 + 30),
                 radius=42,
-                outline=(0, 255, 255, 230),
-                width=2
-            )
-            # Subtle inner highlight (top edge)
-            pd.rounded_rectangle(
-                (3, 3, PANEL_W - 4, PANEL_H // 3),
-                radius=40,
-                outline=(255, 255, 255, 18),
+                outline=(255, 255, 255, 12),
                 width=1
             )
 
             pmask = Image.new("L", (PANEL_W, PANEL_H), 0)
             ImageDraw.Draw(pmask).rounded_rectangle(
-                (0, 0, PANEL_W, PANEL_H), radius=42, fill=255)
+                (0, 0, PANEL_W, PANEL_H), radius=46, fill=255)
             bg.paste(panel, (PANEL_X, PANEL_Y), pmask)
+            draw = ImageDraw.Draw(bg)
 
-            # 3. Thumbnail image with border glow
+            # ===== 3. ANIME THUMBNAIL WITH GLOW =====
             thumb = base.resize((THUMB_W, THUMB_H))
-
-            # Glow frame behind thumbnail
+            
+            # Rainbow glow frame
             glow_layer = Image.new("RGBA", size, (0, 0, 0, 0))
             gd = ImageDraw.Draw(glow_layer)
-            for gi in range(10, 0, -1):
-                ga = int(50 * (gi / 10))
+            
+            for i in range(12, 0, -1):
+                alpha = int(50 * (i / 12))
+                color = (
+                    int(255 * (i/12)),
+                    int(150 * abs(math.sin(i * 0.5))),
+                    int(200 * abs(math.sin(i * 0.3 + 1))),
+                    alpha
+                )
                 gd.rounded_rectangle(
-                    (THUMB_X - gi, THUMB_Y - gi,
-                     THUMB_X + THUMB_W + gi, THUMB_Y + THUMB_H + gi),
-                    radius=28 + gi,
-                    fill=(0, 200, 255, ga)
+                    (THUMB_X - i, THUMB_Y - i,
+                     THUMB_X + THUMB_W + i, THUMB_Y + THUMB_H + i),
+                    radius=28 + i,
+                    fill=color
                 )
             bg = Image.alpha_composite(bg, glow_layer)
             draw = ImageDraw.Draw(bg)
 
+            # Thumbnail with rounded corners
             tmask = Image.new("L", thumb.size, 0)
             ImageDraw.Draw(tmask).rounded_rectangle(
                 (0, 0, THUMB_W, THUMB_H), radius=26, fill=255)
             bg.paste(thumb, (THUMB_X, THUMB_Y), tmask)
 
-            # Thin cyan border around thumbnail
+            # Anime-style border
             draw.rounded_rectangle(
                 (THUMB_X, THUMB_Y, THUMB_X + THUMB_W, THUMB_Y + THUMB_H),
-                radius=26, outline=(0, 255, 255, 160), width=2
+                radius=26, 
+                outline=(255, 150, 200, 180), 
+                width=3
             )
-
-            # 4. Cyan accent bar + Title
-            # Vertical accent bar
+            
+            # Second inner border
             draw.rounded_rectangle(
-                (TITLE_X, TITLE_Y + 2, TITLE_X + 5, TITLE_Y + 46),
-                radius=3, fill=(0, 255, 255)
+                (THUMB_X + 5, THUMB_Y + 5, 
+                 THUMB_X + THUMB_W - 5, THUMB_Y + THUMB_H - 5),
+                radius=22,
+                outline=(0, 200, 255, 100),
+                width=1
             )
 
-            clean_title = re.sub(r"\W+", " ", song.title).title() + " | FushiguroXMusic"
+            # ===== 4. ANIME TITLE WITH DECORATION =====
+            # Decorative accent bar - anime style
+            gradient_colors = [
+                (255, 150, 200),
+                (255, 100, 150),
+                (0, 200, 255)
+            ]
+            for i, color in enumerate(gradient_colors):
+                x_offset = i * 4
+                draw.rounded_rectangle(
+                    (TITLE_X + x_offset, TITLE_Y + 2, 
+                     TITLE_X + x_offset + 4, TITLE_Y + 46),
+                    radius=2,
+                    fill=(color[0], color[1], color[2], 180)
+                )
+
+            # Anime-style title with glow
+            clean_title = re.sub(r"\W+", " ", song.title).title()
             final_title = trim_to_width(clean_title, self.title_font, MAX_TITLE_WIDTH)
-
-            # Drop shadow
-            draw.text((TITLE_X + 13, TITLE_Y + 3), final_title,
-                      fill=(0, 0, 0, 160), font=self.title_font)
+            
+            # Glow effect
+            for i in range(6, 0, -1):
+                alpha = int(30 * (i / 6))
+                draw.text(
+                    (TITLE_X + 15 + i//2, TITLE_Y + 2 + i//2),
+                    final_title,
+                    fill=(0, 200, 255, alpha),
+                    font=self.title_font
+                )
+            
             # Main title
-            draw.text((TITLE_X + 12, TITLE_Y + 1), final_title,
-                      fill=(255, 255, 255), font=self.title_font)
+            draw.text(
+                (TITLE_X + 14, TITLE_Y + 1),
+                final_title,
+                fill=(255, 255, 255),
+                font=self.title_font
+            )
+            
+            # Subtitle glow
+            draw.text(
+                (TITLE_X + 13, TITLE_Y + 2),
+                final_title,
+                fill=(255, 150, 200, 60),
+                font=self.title_font
+            )
 
-            # 5. Meta info
-            meta_text = f"✦  Now Playing   ·   YouTube   ·   {song.view_count or 'Unknown Views'}"
-            draw.text((TITLE_X + 12, META_Y), meta_text,
-                      fill=(140, 200, 220), font=self.regular_font)
+            # ===== 5. ANIME META INFO =====
+            meta_text = f"✦  ᴀɴɪᴍᴇ ᴘʟᴀʏʟɪsᴛ  ✦  ʏᴏᴜᴛᴜʙᴇ  ✦  {song.view_count or 'ᴜɴᴋɴᴏᴡɴ ᴠɪᴇᴡs'}"
+            
+            # Meta info with anime style
+            draw.text(
+                (TITLE_X + 14, META_Y),
+                meta_text,
+                fill=(180, 130, 255, 220),
+                font=self.regular_font
+            )
+            
+            # Small anime decorative element
+            draw_anime_divider(draw, TITLE_X + 14, META_Y + 30, 120)
 
-            # 6. Progress bar
-            # Track BG
+            # ===== 6. ANIME PROGRESS BAR =====
+            # Background with anime glow
             draw.rounded_rectangle(
                 (BAR_X, BAR_Y - 5, BAR_X + BAR_TOTAL_LEN, BAR_Y + 5),
-                radius=12, fill=(45, 45, 55)
+                radius=10,
+                fill=(30, 10, 50)
             )
-            # Played portion
-            draw.rounded_rectangle(
-                (BAR_X, BAR_Y - 5, BAR_X + BAR_RED_LEN, BAR_Y + 5),
-                radius=12, fill=(0, 220, 255)
-            )
-            # Knob glow
-            kx = BAR_X + BAR_RED_LEN
-            for gi in range(8, 0, -1):
-                ga = int(60 * (gi / 8))
-                draw.ellipse(
-                    (kx - 10 - gi, BAR_Y - 10 - gi,
-                     kx + 10 + gi, BAR_Y + 10 + gi),
-                    fill=(0, 200, 255, ga)
+            
+            # Progress with gradient
+            for i in range(BAR_RED_LEN):
+                progress = i / BAR_RED_LEN
+                r = int(255 * progress)
+                g = int(150 + 105 * (1 - progress))
+                b = int(200 * (1 - progress))
+                draw.line(
+                    [(BAR_X + i, BAR_Y - 4), (BAR_X + i, BAR_Y + 4)],
+                    fill=(r, g, b, 200)
                 )
-            # Knob
+            
+            # Glow behind knob
+            for i in range(10, 0, -1):
+                alpha = int(80 * (i / 10))
+                draw.ellipse(
+                    (BAR_X + BAR_RED_LEN - 12 - i, BAR_Y - 12 - i,
+                     BAR_X + BAR_RED_LEN + 12 + i, BAR_Y + 12 + i),
+                    fill=(255, 150, 200, alpha)
+                )
+            
+            # Anime-style knob
             draw.ellipse(
-                (kx - 10, BAR_Y - 10, kx + 10, BAR_Y + 10),
-                fill=(0, 255, 255)
+                (BAR_X + BAR_RED_LEN - 10, BAR_Y - 10,
+                 BAR_X + BAR_RED_LEN + 10, BAR_Y + 10),
+                fill=(255, 150, 200)
             )
             draw.ellipse(
-                (kx - 5, BAR_Y - 5, kx + 5, BAR_Y + 5),
+                (BAR_X + BAR_RED_LEN - 5, BAR_Y - 5,
+                 BAR_X + BAR_RED_LEN + 5, BAR_Y + 5),
                 fill=(255, 255, 255)
             )
+            
+            # Sparkle on knob
+            for angle in [0, 90, 180, 270]:
+                rad = math.radians(angle)
+                sx = BAR_X + BAR_RED_LEN + int(14 * math.cos(rad))
+                sy = BAR_Y + int(14 * math.sin(rad))
+                draw.line(
+                    [(sx - 3, sy), (sx + 3, sy)],
+                    fill=(255, 255, 255, 150),
+                    width=1
+                )
+                draw.line(
+                    [(sx, sy - 3), (sx, sy + 3)],
+                    fill=(255, 255, 255, 150),
+                    width=1
+                )
 
-            # Time stamps
-            draw.text((BAR_X, BAR_Y + 18), "00:00",
-                      fill=(180, 180, 180), font=self.small_font)
+            # Time stamps with anime style
+            draw.text(
+                (BAR_X, BAR_Y + 18),
+                "◈ 00:00",
+                fill=(200, 180, 220),
+                font=self.small_font
+            )
+            
             is_live = getattr(song, "is_live", False)
-            end_text = "🔴 LIVE" if is_live else song.duration
+            end_text = "✦ ʟɪᴠᴇ ✦" if is_live else f"◈ {song.duration}"
             tw = self.small_font.getlength(end_text)
-            draw.text((BAR_X + BAR_TOTAL_LEN - tw, BAR_Y + 18),
-                      end_text,
-                      fill=(0, 255, 255) if is_live else (180, 180, 180),
-                      font=self.small_font)
+            draw.text(
+                (BAR_X + BAR_TOTAL_LEN - tw, BAR_Y + 18),
+                end_text,
+                fill=(255, 150, 200) if is_live else (200, 180, 220),
+                font=self.small_font
+            )
 
-            # 7. Watermark - Updated to FushiguroXMusic
-            watermark_text = "✦ 𝓕𝓾𝓼𝓱𝓲𝓰𝓾𝓻𝓸X𝓜𝓾𝓼𝓲𝓬 ✦"
+            # ===== 7. BOT WATERMARK =====
+            watermark_text = f"✦ {BOT_NAME} ✦"
             
-            # Position watermark at bottom right with some padding
-            ww = self.signature_font.getlength(watermark_text)
-            wh = self.signature_font.getbbox(watermark_text)[3] - self.signature_font.getbbox(watermark_text)[1]
+            ww = self.bot_font.getlength(watermark_text)
+            wh = self.bot_font.getbbox(watermark_text)[3] - self.bot_font.getbbox(watermark_text)[1]
             
-            wm_x = PANEL_X + PANEL_W - ww - 30
-            wm_y = PANEL_Y + PANEL_H - wh - 20
+            wm_x = PANEL_X + PANEL_W - ww - 25
+            wm_y = PANEL_Y + PANEL_H - wh - 15
             
-            # Add glow effect behind watermark
-            for gi in range(6, 0, -1):
-                ga = int(40 * (gi / 6))
+            # Anime glow watermark
+            for i in range(8, 0, -1):
+                alpha = int(50 * (i / 8))
                 draw.text(
-                    (wm_x + gi//2, wm_y + gi//2),
+                    (wm_x + i//2, wm_y + i//2),
                     watermark_text,
-                    fill=(0, 200, 255, ga),
-                    font=self.signature_font
+                    fill=(255, 150, 200, alpha),
+                    font=self.bot_font
                 )
             
-            # Draw main watermark with cyan gradient effect
+            # Main watermark
             draw.text(
                 (wm_x, wm_y),
                 watermark_text,
-                fill=(0, 255, 255, 220),
-                font=self.signature_font
+                fill=(255, 200, 220, 230),
+                font=self.bot_font
             )
             
-            # Second layer for glow
+            # Secondary glow
             draw.text(
                 (wm_x - 1, wm_y - 1),
                 watermark_text,
-                fill=(0, 150, 255, 60),
-                font=self.signature_font
+                fill=(0, 200, 255, 50),
+                font=self.bot_font
             )
+
+            # ===== 8. ANIME DECORATIVE ELEMENTS =====
+            # Small sakura flowers at corners
+            for corner in [(PANEL_X + 15, PANEL_Y + 15),
+                          (PANEL_X + PANEL_W - 15, PANEL_Y + 15),
+                          (PANEL_X + 15, PANEL_Y + PANEL_H - 15),
+                          (PANEL_X + PANEL_W - 15, PANEL_Y + PANEL_H - 15)]:
+                for i in range(5):
+                    angle = (i / 5) * 2 * math.pi
+                    px = corner[0] + int(12 * math.cos(angle))
+                    py = corner[1] + int(12 * math.sin(angle))
+                    draw.ellipse(
+                        (px - 3, py - 3, px + 3, py + 3),
+                        fill=(255, 150, 200, 80)
+                    )
 
             bg.save(output)
             try:
@@ -332,5 +555,6 @@ class Thumbnail:
                 pass
             return output
 
-        except Exception:
+        except Exception as e:
+            print(f"Error in anime thumbnail generation: {e}")
             return config.DEFAULT_THUMB
