@@ -1,9 +1,6 @@
 # Copyright (c) 2025 AnonymousX1025
-# Licensed under the MIT License.
-# This file is part of AnonXMusic
-#
-# Modified for Elevenyts Project
-# Changes: Custom UI with glassmorphism, neon effects, and premium styling
+# Modified for EXACT YouTube Music Style Thumbnails
+# Like real YouTube Music video thumbnails
 
 import os
 import asyncio
@@ -22,17 +19,13 @@ W, H = 1280, 720
 CACHE_DIR = "cache"
 os.makedirs(CACHE_DIR, exist_ok=True)
 
-BOT_NAME = "𝓕𝓾𝓼𝓱𝓲𝓰𝓾𝓻𝓸X𝓜𝓾𝓼𝓲𝓬"
-
-# Premium Colors
-GOLD = (255, 196, 80)
-CYAN = (0, 220, 255)
-PURPLE = (170, 90, 255)
+# Colors
 WHITE = (255, 255, 255)
-DARK = (10, 10, 18)
-
-# Default thumbnail fallback (create a default image if needed)
-DEFAULT_THUMB = None
+BLACK = (0, 0, 0)
+GRAY = (150, 150, 150)
+LIGHT_GRAY = (200, 200, 200)
+DARK_GRAY = (50, 50, 50)
+YELLOW = (255, 200, 0)
 
 
 # =========================
@@ -40,19 +33,19 @@ DEFAULT_THUMB = None
 # =========================
 
 def safe_text(text, fallback="Unknown"):
-    """Safely get text or return fallback"""
     return text if text else fallback
-
 
 def fit_text(font, text, max_width):
     """Truncate text with ellipsis if too long"""
-    if font.getlength(text) <= max_width:
-        return text
-    for i in range(len(text), 0, -1):
-        if font.getlength(text[:i] + "…") <= max_width:
-            return text[:i] + "…"
-    return "…"
-
+    try:
+        if font.getlength(text) <= max_width:
+            return text
+        for i in range(len(text), 0, -1):
+            if font.getlength(text[:i] + "…") <= max_width:
+                return text[:i] + "…"
+        return "…"
+    except:
+        return text[:50] + "…" if len(text) > 50 else text
 
 def format_views(views):
     """Format view count to K/M format"""
@@ -66,13 +59,25 @@ def format_views(views):
     except:
         return "0"
 
+def create_gradient(width, height, color1, color2):
+    """Create a vertical gradient"""
+    gradient = Image.new('RGBA', (width, height), color1)
+    draw = ImageDraw.Draw(gradient)
+    for y in range(height):
+        ratio = y / height
+        r = int(color1[0] * (1 - ratio) + color2[0] * ratio)
+        g = int(color1[1] * (1 - ratio) + color2[1] * ratio)
+        b = int(color1[2] * (1 - ratio) + color2[2] * ratio)
+        a = int(color1[3] * (1 - ratio) + color2[3] * ratio)
+        draw.line([(0, y), (width, y)], fill=(r, g, b, a))
+    return gradient
+
 
 # =========================
-# TRACK CLASS (Mock if not available)
+# TRACK CLASS
 # =========================
 
 class Track:
-    """Simple Track class for compatibility"""
     def __init__(self, id, title, thumbnail, channel_name, view_count, duration):
         self.id = id
         self.title = title
@@ -88,301 +93,218 @@ class Track:
 
 class Thumbnail:
     """
-    Premium Thumbnail Generator with Glassmorphism Design
-    Original: Copyright (c) 2025 AnonymousX1025 (MIT License)
+    EXACT YouTube Music Style Thumbnail Generator
+    Like real YouTube Music video thumbnails
     """
 
     def __init__(self):
         self.session = None
-        self.rect = (914, 514)
-        self.fill = WHITE
-        self.mask = Image.new("L", self.rect, 0)
         
-        # Try to load custom fonts, fallback to default
+        # Load fonts
         try:
             self.font_title = ImageFont.truetype(
-                "Elevenyts/helpers/Raleway-Bold.ttf", 50
+                "Elevenyts/helpers/Raleway-Bold.ttf", 65
             )
-            self.font_sub = ImageFont.truetype(
+            self.font_artist = ImageFont.truetype(
+                "Elevenyts/helpers/Inter-Light.ttf", 32
+            )
+            self.font_views = ImageFont.truetype(
                 "Elevenyts/helpers/Inter-Light.ttf", 26
             )
-            self.font_small = ImageFont.truetype(
-                "Elevenyts/helpers/Inter-Light.ttf", 20
-            )
-            # Also keep old fonts for compatibility
-            self.font1 = ImageFont.truetype(
-                "Elevenyts/helpers/Raleway-Bold.ttf", 30
-            )
-            self.font2 = ImageFont.truetype(
-                "Elevenyts/helpers/Inter-Light.ttf", 30
+            self.font_sub = ImageFont.truetype(
+                "Elevenyts/helpers/Inter-Light.ttf", 22
             )
         except:
-            print("⚠️ Custom fonts not found, using default fonts")
+            print("⚠️ Custom fonts not found, using default")
             self.font_title = ImageFont.load_default()
+            self.font_artist = ImageFont.load_default()
+            self.font_views = ImageFont.load_default()
             self.font_sub = ImageFont.load_default()
-            self.font_small = ImageFont.load_default()
-            self.font1 = ImageFont.load_default()
-            self.font2 = ImageFont.load_default()
 
-    async def start(self) -> None:
-        """Initialize HTTP session"""
+    async def start(self):
         self.session = aiohttp.ClientSession()
 
-    async def close(self) -> None:
-        """Close HTTP session"""
+    async def close(self):
         if self.session:
             await self.session.close()
 
-    async def save_thumb(self, output_path: str, url: str) -> str:
-        """Download thumbnail from URL"""
+    async def save_thumb(self, output_path, url):
         if not self.session:
             await self.start()
-        
         async with self.session.get(url) as resp:
             with open(output_path, "wb") as f:
                 f.write(await resp.read())
         return output_path
 
     # ========================================
-    # ORIGINAL GENERATE METHOD (Kept for compatibility)
+    # YOUTUBE MUSIC STYLE GENERATE
     # ========================================
-    
-    async def generate_original(self, song, size=(1280, 720)) -> str:
-        """Original AnonXMusic style thumbnail"""
+
+    async def generate(self, song) -> str:
+        """Generate YouTube Music-style thumbnail"""
         try:
-            temp = f"{CACHE_DIR}/temp_{song.id}.jpg"
-            output = f"{CACHE_DIR}/{song.id}_original.png"
-            
-            if os.path.exists(output):
-                return output
-
-            # Download thumbnail
-            if not self.session:
-                await self.start()
-            await self.save_thumb(temp, song.thumbnail)
-            
-            # Process image
-            thumb = Image.open(temp).convert("RGBA").resize(
-                size, Image.Resampling.LANCZOS
-            )
-            blur = thumb.filter(ImageFilter.GaussianBlur(25))
-            image = ImageEnhance.Brightness(blur).enhance(0.40)
-
-            # Create rounded rectangle
-            _rect = ImageOps.fit(
-                thumb, self.rect,
-                method=Image.LANCZOS,
-                centering=(0.5, 0.5)
-            )
-            
-            # Reset mask for each generation
-            self.mask = Image.new("L", self.rect, 0)
-            ImageDraw.Draw(self.mask).rounded_rectangle(
-                (0, 0, self.rect[0], self.rect[1]),
-                radius=15,
-                fill=255
-            )
-            _rect.putalpha(self.mask)
-            image.paste(_rect, (183, 30), _rect)
-
-            # Add text
-            draw = ImageDraw.Draw(image)
-            
-            # Channel name and views
-            channel = safe_text(song.channel_name, "Unknown Channel")[:25]
-            views = format_views(getattr(song, "view_count", 0))
-            draw.text(
-                (50, 560),
-                f"{channel} | {views} views",
-                font=self.font2,
-                fill=self.fill
-            )
-            
-            # Title
-            title = safe_text(song.title, "Unknown Track")[:50]
-            draw.text((50, 600), title, font=self.font1, fill=self.fill)
-            
-            # Duration and progress
-            draw.text((40, 650), "0:01", font=self.font1)
-            draw.line(
-                [(140, 670), (1160, 670)],
-                fill=self.fill,
-                width=5,
-                joint="curve"
-            )
-            
-            duration = safe_text(getattr(song, "duration", "0:00"))
-            draw.text((1185, 650), duration, font=self.font1, fill=self.fill)
-
-            image.save(output)
-            try:
-                os.remove(temp)
-            except:
-                pass
-            
-            return output
-            
-        except Exception as e:
-            print(f"❌ Original thumbnail error: {e}")
-            return DEFAULT_THUMB
-
-    # ========================================
-    # NEW PREMIUM GENERATE METHOD (Your Design)
-    # ========================================
-
-    async def generate(self, song, size=(1280, 720)) -> str:
-        """Generate premium thumbnail with glassmorphism design"""
-        try:
-            # Use a different output name to avoid conflicts
-            output = f"{CACHE_DIR}/{song.id}_premium.png"
+            output = f"{CACHE_DIR}/{song.id}_youtube_music.png"
             if os.path.exists(output):
                 return output
 
             temp = f"{CACHE_DIR}/temp_{song.id}.jpg"
             
-            # Get thumbnail URL
             url = getattr(song, "thumbnail", None)
             if not url:
                 url = f"https://img.youtube.com/vi/{song.id}/maxresdefault.jpg"
 
-            # Download thumbnail
-            if not self.session:
-                await self.start()
             await self.save_thumb(temp, url)
 
-            # Run rendering in thread pool
             return await asyncio.get_event_loop().run_in_executor(
-                None, self._render_premium, temp, output, song
+                None, self._render_youtube_music, temp, output, song
             )
 
         except Exception as e:
-            print(f"❌ Premium thumbnail error: {e}")
-            # Fallback to original style
-            return await self.generate_original(song)
+            print(f"❌ Thumbnail error: {e}")
+            return None
 
     # ========================================
-    # PREMIUM RENDER ENGINE
+    # YOUTUBE MUSIC RENDER ENGINE
     # ========================================
 
-    def _render_premium(self, temp, output, song):
-        """Render premium glassmorphism thumbnail"""
+    def _render_youtube_music(self, temp, output, song):
+        """Render exact YouTube Music-style thumbnail"""
         try:
-            # Open and resize image
+            # Load main image
             img = Image.open(temp).convert("RGBA").resize((W, H))
 
-            # ====== BACKGROUND ======
-            bg = img.filter(ImageFilter.GaussianBlur(40))
-            bg = ImageEnhance.Brightness(bg).enhance(0.25)
-            bg = ImageEnhance.Contrast(bg).enhance(1.3)
+            # ====== STEP 1: BLUR BACKGROUND ======
+            bg_blur = img.copy().filter(ImageFilter.GaussianBlur(35))
+            bg_blur = ImageEnhance.Brightness(bg_blur).enhance(0.30)
+            bg_blur = ImageEnhance.Contrast(bg_blur).enhance(1.3)
 
-            # Dark overlay
-            overlay = Image.new("RGBA", (W, H), (0, 0, 0, 170))
-            bg = Image.alpha_composite(bg, overlay)
+            # ====== STEP 2: DARK OVERLAY ======
+            dark = Image.new("RGBA", (W, H), (0, 0, 0, 180))
+            bg = Image.alpha_composite(bg_blur, dark)
+
+            # ====== STEP 3: MAIN IMAGE (CENTER - LARGE) ======
+            main_img = img.copy()
+            
+            # Calculate size - keep aspect ratio, fill most of the frame
+            target_width = 900
+            target_height = int(main_img.height * (target_width / main_img.width))
+            
+            # If height is too much, adjust
+            if target_height > 650:
+                target_height = 650
+                target_width = int(main_img.width * (target_height / main_img.height))
+            
+            main_img = main_img.resize((target_width, target_height), Image.Resampling.LANCZOS)
+            
+            # Center position
+            x_pos = (W - target_width) // 2
+            y_pos = (H - target_height) // 2 - 30  # Slightly up for text
+
+            # PASTE WITH NO ROUNDED CORNERS - NO BORDER
+            bg.paste(main_img, (x_pos, y_pos), main_img)
+
+            # ====== STEP 4: BOTTOM GRADIENT FOR TEXT ======
+            gradient = create_gradient(
+                W, 280,
+                (0, 0, 0, 0),
+                (0, 0, 0, 220)
+            )
+            bg.paste(gradient, (0, H - 280), gradient)
 
             draw = ImageDraw.Draw(bg)
 
-            # ====== GLASS PANEL ======
-            px, py = 90, 60
-            pw, ph = 1100, 600
-
-            draw.rounded_rectangle(
-                (px, py, px + pw, py + ph),
-                radius=45,
-                fill=(18, 18, 28, 220),
-                outline=CYAN,
-                width=2
-            )
-
-            # ====== THUMBNAIL ======
-            thumb = img.resize((920, 420))
-            tx, ty = px + 90, py + 40
-
-            # Rounded corners
-            mask = Image.new("L", thumb.size, 0)
-            ImageDraw.Draw(mask).rounded_rectangle(
-                (0, 0, 920, 420),
-                radius=30,
-                fill=255
-            )
-
-            bg.paste(thumb, (tx, ty), mask)
-
-            # Neon border
-            draw.rounded_rectangle(
-                (tx - 3, ty - 3, tx + 920 + 3, ty + 420 + 3),
-                radius=35,
-                outline=PURPLE,
-                width=2
-            )
-
-            # ====== TITLE ======
+            # ====== STEP 5: SONG TITLE (Bold, Large) ======
             title = safe_text(getattr(song, "title", "Unknown Track"))
-            title = fit_text(self.font_title, title, 850)
+            title = fit_text(self.font_title, title, 1100)
 
-            # Main title
+            title_x = 60
+            title_y = H - 160
+
+            # Outline for readability
+            for dx, dy in [(-3, -3), (-3, 3), (3, -3), (3, 3)]:
+                draw.text(
+                    (title_x + dx, title_y + dy),
+                    title,
+                    font=self.font_title,
+                    fill=(0, 0, 0)
+                )
+            
+            # Main white text
             draw.text(
-                (tx, ty + 440),
+                (title_x, title_y),
                 title,
                 font=self.font_title,
                 fill=WHITE
             )
 
-            # Shadow
-            draw.text(
-                (tx + 2, ty + 442),
-                title,
-                font=self.font_title,
-                fill=(0, 0, 0, 120)
-            )
+            # ====== STEP 6: ARTIST NAME ======
+            artist = safe_text(getattr(song, "channel_name", "Unknown Artist"))
+            artist = fit_text(self.font_artist, artist, 800)
+            
+            artist_x = title_x
+            artist_y = title_y + 75
 
-            # ====== META INFO ======
-            views = format_views(getattr(song, "view_count", 0))
-            channel = safe_text(getattr(song, "channel_name", "Unknown"), "Unknown")[:20]
-
-            meta = f"▶ {views} views   •   {channel}   •   {BOT_NAME}"
-            draw.text(
-                (tx, ty + 505),
-                meta,
-                font=self.font_sub,
-                fill=GOLD
-            )
-
-            # ====== PROGRESS BAR ======
-            bx, by = tx, ty + 555
-            bw = 880
-
-            # Background track
-            draw.rounded_rectangle(
-                (bx, by, bx + bw, by + 10),
-                radius=10,
-                fill=(40, 40, 60)
-            )
-
-            # Progress (55%)
-            progress = 0.55
-            fill_width = int(bw * progress)
-
-            # Cyan progress
-            for i in range(fill_width):
-                draw.line(
-                    (bx + i, by, bx + i, by + 10),
-                    fill=CYAN
+            # Outline
+            for dx, dy in [(-2, -2), (-2, 2), (2, -2), (2, 2)]:
+                draw.text(
+                    (artist_x + dx, artist_y + dy),
+                    artist,
+                    font=self.font_artist,
+                    fill=(0, 0, 0)
                 )
-
-            # Purple knob
-            draw.ellipse(
-                (bx + fill_width - 10, by - 6,
-                 bx + fill_width + 10, by + 16),
-                fill=PURPLE
+            
+            # Artist name in gray
+            draw.text(
+                (artist_x, artist_y),
+                artist,
+                font=self.font_artist,
+                fill=LIGHT_GRAY
             )
 
-            # ====== DURATION ======
+            # ====== STEP 7: VIEWS & DURATION ======
+            views = format_views(getattr(song, "view_count", 0))
             duration = safe_text(getattr(song, "duration", "0:00"))
+            
+            # Duration badge (like YouTube Music)
+            badge_text = f"▶ {views} views"
+            
+            # Views
+            views_y = artist_y + 45
             draw.text(
-                (bx + bw - 100, by - 5),
+                (title_x, views_y),
+                badge_text,
+                font=self.font_views,
+                fill=GRAY
+            )
+
+            # ====== STEP 8: DURATION BADGE (Top Right) ======
+            # Like YouTube Music duration badge
+            badge_w = 100
+            badge_h = 40
+            badge_x = W - badge_w - 20
+            badge_y = 20
+            
+            # Background for duration badge
+            draw.rectangle(
+                [badge_x, badge_y, badge_x + badge_w, badge_y + badge_h],
+                fill=(0, 0, 0, 200)
+            )
+            
+            # Duration text in badge
+            draw.text(
+                (badge_x + 15, badge_y + 8),
                 duration,
-                font=self.font_small,
-                fill=(200, 200, 200)
+                font=self.font_sub,
+                fill=WHITE
+            )
+
+            # ====== STEP 9: BOTTOM RIGHT WATERMARK ======
+            # Small bot name
+            draw.text(
+                (W - 200, H - 40),
+                "YouTube Music",
+                font=self.font_sub,
+                fill=(80, 80, 80)
             )
 
             # Save
@@ -396,6 +318,47 @@ class Thumbnail:
 
         except Exception as e:
             print(f"❌ Render error: {e}")
+            return self._render_fallback(temp, output, song)
+
+    # ========================================
+    # FALLBACK RENDER
+    # ========================================
+
+    def _render_fallback(self, temp, output, song):
+        """Simple fallback thumbnail"""
+        try:
+            img = Image.open(temp).convert("RGB").resize((W, H))
+            
+            # Dark overlay
+            overlay = Image.new("RGBA", (W, H), (0, 0, 0, 150))
+            img = img.convert("RGBA")
+            img = Image.alpha_composite(img, overlay)
+            
+            draw = ImageDraw.Draw(img)
+            
+            # Title
+            title = safe_text(getattr(song, "title", "Unknown"))[:60]
+            try:
+                font1 = ImageFont.truetype("arial.ttf", 60)
+                font2 = ImageFont.truetype("arial.ttf", 30)
+            except:
+                font1 = ImageFont.load_default()
+                font2 = ImageFont.load_default()
+            
+            # Title with outline
+            for dx, dy in [(-2, -2), (-2, 2), (2, -2), (2, 2)]:
+                draw.text((60+dx, 500+dy), title, font=font1, fill=(0, 0, 0))
+            draw.text((60, 500), title, font=font1, fill=WHITE)
+            
+            # Artist
+            artist = safe_text(getattr(song, "channel_name", "Unknown"))[:30]
+            draw.text((60, 580), f"🎵 {artist}", font=font2, fill=LIGHT_GRAY)
+            
+            img.save(output)
+            return output
+            
+        except Exception as e:
+            print(f"❌ Fallback error: {e}")
             return None
 
 
@@ -403,36 +366,22 @@ class Thumbnail:
 # CONVENIENCE FUNCTIONS
 # ========================================
 
-async def generate_thumbnail(song, premium=True):
-    """
-    Generate thumbnail for a song
-    
-    Args:
-        song: Track object
-        premium: If True, use premium design, else original
-    
-    Returns:
-        Path to generated thumbnail
-    """
+async def generate_thumbnail(song) -> str:
+    """Generate YouTube Music-style thumbnail"""
     thumb = Thumbnail()
     await thumb.start()
-    
-    if premium:
-        result = await thumb.generate(song)
-    else:
-        result = await thumb.generate_original(song)
-    
+    result = await thumb.generate(song)
     await thumb.close()
     return result
 
 
 # ========================================
-# TEST CODE (Remove in production)
+# TEST CODE
 # ========================================
 
 if __name__ == "__main__":
-    # Test the thumbnail generator
     async def test():
+        # Test song
         song = Track(
             id="dQw4w9WgXcQ",
             title="Never Gonna Give You Up",
@@ -442,12 +391,10 @@ if __name__ == "__main__":
             duration="3:33"
         )
         
-        # Test premium
-        result = await generate_thumbnail(song, premium=True)
-        print(f"✅ Premium thumbnail saved: {result}")
-        
-        # Test original
-        result = await generate_thumbnail(song, premium=False)
-        print(f"✅ Original thumbnail saved: {result}")
+        result = await generate_thumbnail(song)
+        if result:
+            print(f"✅ Thumbnail saved: {result}")
+        else:
+            print("❌ Failed")
     
     asyncio.run(test())
