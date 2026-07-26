@@ -91,11 +91,23 @@ async def main():
         await tune.boot()
 
         # Step 7: Load all plugin modules (commands like /play, /pause, etc.)
+        # ✅ Added support for tagall plugin
         for module in all_modules:
             try:
                 importlib.import_module(f"Elevenyts.plugins.{module}")
+                logger.info(f"✅ Loaded plugin: {module}")
             except Exception as e:
-                logger.error(f"Failed to load plugin {module}: {e}", exc_info=True)
+                logger.error(f"❌ Failed to load plugin {module}: {e}", exc_info=True)
+        
+        # ✅ Explicitly load tagall plugin if not in all_modules
+        try:
+            importlib.import_module("Elevenyts.plugins.tagall")
+            logger.info("✅ Loaded plugin: tagall")
+        except ImportError:
+            logger.warning("⚠️ tagall plugin not found, skipping...")
+        except Exception as e:
+            logger.error(f"❌ Failed to load tagall plugin: {e}", exc_info=True)
+        
         logger.info(f"🔌 Loaded {len(all_modules)} plugin modules.")
 
         # Step 8: Load sudo users and blacklisted users from database
@@ -104,6 +116,13 @@ async def main():
         app.sudo_filter.update(sudoers)  # Add sudo users to filter
         app.bl_users.update(await db.get_blacklisted())  # Add blacklisted users to filter
         logger.info(f"👑 Loaded {len(app.sudoers)} sudo users.")
+        
+        # ✅ Log tagall command availability
+        logger.info("📌 Commands available:")
+        logger.info("   • /tagall - Tag all members with emoji stickers")
+        logger.info("   • /tagcustom - Tag with custom emojis")
+        logger.info("   • /taglist - Show available emojis")
+        
         logger.info("\n🎉 Bot started successfully! Ready to play music! 🎵\n")
 
         # Step 9: Keep the bot running (press Ctrl+C to stop)
