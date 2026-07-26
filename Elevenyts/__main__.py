@@ -90,8 +90,56 @@ async def main():
         # Step 6: Initialize voice call handler
         await tune.boot()
 
-        # Step 7: Load all plugin modules (commands like /play, /pause, etc.)
-        # ✅ Added support for tagall plugin
+        # ==========================================
+        # STEP 7: FORCE LOAD TAGALL (EMERGENCY FIX)
+        # ==========================================
+        logger.info("=" * 50)
+        logger.info("🔍 FORCE LOADING TAGALL PLUGIN")
+        logger.info("=" * 50)
+        
+        # Check if file exists
+        import os
+        tagall_path = "Elevenyts/plugins/tagall.py"
+        if os.path.exists(tagall_path):
+            logger.info(f"✅ tagall.py found at {tagall_path}")
+        else:
+            logger.error(f"❌ tagall.py NOT found at {tagall_path}")
+        
+        # Load the module
+        try:
+            import Elevenyts.plugins.tagall
+            logger.info("✅ tagall module imported successfully")
+            
+            # Manually register handlers
+            from Elevenyts import app as bot_app
+            from Elevenyts.plugins.tagall import tag_all, tag_test, tag_list
+            
+            # Remove if already exists (to avoid duplicates)
+            try:
+                bot_app.remove_handler(tag_all, group=1)
+                bot_app.remove_handler(tag_test, group=1)
+                bot_app.remove_handler(tag_list, group=1)
+                logger.info("✅ Removed existing handlers (if any)")
+            except:
+                pass
+            
+            # Add handlers with priority
+            bot_app.add_handler(tag_all, group=1)
+            bot_app.add_handler(tag_test, group=1)
+            bot_app.add_handler(tag_list, group=1)
+            
+            logger.info("✅ Tagall handlers manually REGISTERED with force!")
+            
+        except ImportError:
+            logger.warning("⚠️ tagall plugin not found, skipping...")
+        except Exception as e:
+            logger.error(f"❌ Failed to load tagall plugin: {e}")
+            import traceback
+            traceback.print_exc()
+
+        # ==========================================
+        # STEP 8: LOAD OTHER PLUGINS
+        # ==========================================
         for module in all_modules:
             try:
                 importlib.import_module(f"Elevenyts.plugins.{module}")
@@ -99,18 +147,9 @@ async def main():
             except Exception as e:
                 logger.error(f"❌ Failed to load plugin {module}: {e}", exc_info=True)
         
-        # ✅ Explicitly load tagall plugin if not in all_modules
-        try:
-            importlib.import_module("Elevenyts.plugins.tagall")
-            logger.info("✅ Loaded plugin: tagall")
-        except ImportError:
-            logger.warning("⚠️ tagall plugin not found, skipping...")
-        except Exception as e:
-            logger.error(f"❌ Failed to load tagall plugin: {e}", exc_info=True)
-        
         logger.info(f"🔌 Loaded {len(all_modules)} plugin modules.")
 
-        # Step 8: Load sudo users and blacklisted users from database
+        # Step 9: Load sudo users and blacklisted users from database
         sudoers = await db.get_sudoers()
         app.sudoers.update(sudoers)  # Add sudo users to set
         app.sudo_filter.update(sudoers)  # Add sudo users to filter
@@ -118,14 +157,16 @@ async def main():
         logger.info(f"👑 Loaded {len(app.sudoers)} sudo users.")
         
         # ✅ Log tagall command availability
-        logger.info("📌 Commands available:")
+        logger.info("=" * 50)
+        logger.info("📌 COMMANDS AVAILABLE:")
         logger.info("   • /tagall - Tag all members with emoji stickers")
-        logger.info("   • /tagcustom - Tag with custom emojis")
+        logger.info("   • /tagtest - Test tagall plugin")
         logger.info("   • /taglist - Show available emojis")
+        logger.info("=" * 50)
         
         logger.info("\n🎉 Bot started successfully! Ready to play music! 🎵\n")
 
-        # Step 9: Keep the bot running (press Ctrl+C to stop)
+        # Step 10: Keep the bot running (press Ctrl+C to stop)
         try:
             await idle()
         except KeyboardInterrupt:
@@ -133,7 +174,7 @@ async def main():
         except Exception as e:
             logger.error(f"Error during idle: {e}", exc_info=True)
         
-        # Step 10: Cleanup and shutdown when bot is stopped
+        # Step 11: Cleanup and shutdown when bot is stopped
         await stop()
     except Exception as e:
         logger.error(f"Critical error in main: {e}", exc_info=True)
