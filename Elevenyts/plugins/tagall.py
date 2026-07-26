@@ -1,14 +1,11 @@
 # Elevenyts/plugins/tagall.py
-# Tag All Command with Emoji Stickers
+# Complete Working Version - Copy Paste This Exact Code
 
 import asyncio
 import random
-import logging
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from pyrogram.enums import ChatMemberStatus
-
-logger = logging.getLogger(__name__)
 
 # =========================
 # EMOJI STICKERS
@@ -34,12 +31,12 @@ TAG_LIMIT = 30
 # TEST COMMAND
 # =========================
 
-@Client.on_message(filters.command("tagtest") & filters.group)
+@Client.on_message(filters.command("tagtest") & filters.group, group=1)
 async def tag_test(client: Client, message: Message):
     """Test if plugin is working"""
-    await message.reply_text("✅ **Tagall plugin is working!**\n\nTry /tagall now!")
+    await message.reply_text("✅ **Tagall plugin is ALIVE and WORKING!**\n\nTry /tagall now!")
 
-@Client.on_message(filters.command("tagtest") & filters.private)
+@Client.on_message(filters.command("tagtest") & filters.private, group=1)
 async def tag_test_private(client: Client, message: Message):
     """Test in private"""
     await message.reply_text("✅ **Tagall plugin is working in private!**\n\nAdd me to a group as admin and try /tagall")
@@ -49,19 +46,20 @@ async def tag_test_private(client: Client, message: Message):
 # =========================
 
 @Client.on_message(filters.command("tagall") & filters.group, group=1)
-async def tag_all_group(client: Client, message: Message):
+async def tag_all(client: Client, message: Message):
     """Tag all members with emoji stickers"""
     
     try:
-        logger.info(f"📌 /tagall command received in group: {message.chat.id}")
+        # Send immediate acknowledgment
+        await message.reply_text("⏳ **Processing /tagall...**")
         
-        # Check admin
+        # Check if user is admin
         user_status = await client.get_chat_member(message.chat.id, message.from_user.id)
         if user_status.status not in [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]:
             await message.reply_text("❌ **Only admins can use this command!**")
             return
         
-        # Check bot admin
+        # Check if bot is admin
         bot_status = await client.get_chat_member(message.chat.id, client.me.id)
         if bot_status.status not in [ChatMemberStatus.ADMINISTRATOR]:
             await message.reply_text("❌ **Bot needs to be admin to tag members!**")
@@ -126,14 +124,13 @@ async def tag_all_group(client: Client, message: Message):
         )
         
     except Exception as e:
-        logger.error(f"❌ Tagall error: {e}")
         await message.reply_text(f"❌ Error: {str(e)}")
 
 # =========================
 # TAGLIST COMMAND
 # =========================
 
-@Client.on_message(filters.command("taglist") & filters.group)
+@Client.on_message(filters.command("taglist") & filters.group, group=1)
 async def tag_list(client: Client, message: Message):
     """Show available emojis"""
     emoji_list = " ".join(EMOJI_STICKERS[:20])
@@ -144,4 +141,16 @@ async def tag_list(client: Client, message: Message):
         f"• `/tagall` - Tag all members\n"
         f"• `/taglist` - Show emojis\n"
         f"• `/tagtest` - Test plugin"
-        )
+    )
+
+# =========================
+# PRIVATE CHAT HANDLER
+# =========================
+
+@Client.on_message(filters.command("tagall") & filters.private, group=1)
+async def tag_all_private(client: Client, message: Message):
+    """Tag all members - Private chat"""
+    await message.reply_text(
+        "❌ **This command only works in groups!**\n\n"
+        "Add me to a group as admin and try again."
+                                             )
